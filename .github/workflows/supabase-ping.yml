@@ -1,0 +1,14 @@
+name: Supabase keep-alive ping
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # tous les jours à 6h UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler l'endpoint /api/ping
+        run: |
+          curl --fail --silent --show-error "${{ secrets.SUPABASE_PING_URL }}"

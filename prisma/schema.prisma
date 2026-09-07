@@ -1,0 +1,54 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CodeOrigin {
+  physical
+  digital
+}
+
+enum CodeStatus {
+  unused
+  used
+}
+
+model Code {
+  id             String     @id @default(cuid())
+  codeValue      String     @unique @map("code_value")
+  origin         CodeOrigin
+  status         CodeStatus @default(unused)
+  maxDownloads   Int        @default(1) @map("max_downloads")
+  downloadsUsed  Int        @default(0) @map("downloads_used")
+  batchLabel     String?    @map("batch_label")
+  redeemedAt     DateTime?  @map("redeemed_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  order          Order?
+
+  @@map("codes")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  failed
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  sumupCheckoutId  String      @unique @map("sumup_checkout_id")
+  email            String
+  status           OrderStatus @default(pending)
+  codeId           String?     @unique @map("code_id")
+  code             Code?       @relation(fields: [codeId], references: [id])
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  @@map("orders")
+}

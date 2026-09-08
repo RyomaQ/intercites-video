@@ -4,16 +4,14 @@
 
 Intercité est un DVD de 90 minutes de BMX street avec des riders de la scène française. Le DVD est vendu physiquement, mais on veut aussi donner aux acheteurs un accès en ligne au film (téléchargement uniquement, pas de streaming), et permettre en plus une vente 100% numérique (sans DVD physique) via le même système.
 
-## ⚠️ Point à vérifier en priorité (avant de coder la partie paiement)
+## ⚠️ Point vérifié (architecture du parcours numérique)
 
-Il faut confirmer si les commandes passées sur la boutique en ligne SumUp (Online Store, celle qui contient déjà les autres articles physiques) sont récupérables via l'API SumUp — avec l'email du client et le produit acheté. Cette API est bien documentée pour les paiements créés via l'API Checkout (intégration custom), mais rien ne confirme qu'elle couvre aussi les commandes passées via l'Online Store (ça pourrait être un système séparé en coulisses).
+Question initiale : les commandes passées sur la boutique en ligne SumUp (Online Store) sont-elles récupérables via l'API SumUp avec l'email du client et le produit acheté ?
 
-**Statut : 🔄 en cours.** Le MCP SumUp est connecté en local (voir section Outils de développement) pour interroger les transactions/checkouts en langage naturel pendant le dev. Le test consistant à passer une vraie commande test sur `intercitesbmx.com` et vérifier si elle apparaît via l'API n'a pas encore été effectué / conclu.
+**Statut : ✅ tranché — option "page d'achat séparée".** Plutôt que de dépendre de l'Online Store existant, le parcours numérique a été implémenté comme une page d'achat séparée sur `video.intercitesbmx.com` qui crée elle-même le paiement via l'API Checkout SumUp (`src/lib/sumup.ts`, `createHostedCheckout`). Ça garantit un accès direct à l'email et à la commande sans dépendre du comportement de l'Online Store.
 
-**Comment tester** : ajouter l'article "Film numérique" sur `intercitesbmx.com` (SumUp Online Store), passer une commande test, puis vérifier si elle apparaît via l'API SumUp (Transactions/Checkouts) avec l'email du client et une référence au produit acheté.
-
-- **Si oui** : on garde l'architecture décrite plus bas (redirection vers l'article SumUp existant, récupération via l'API/webhook).
-- **Si non** : il faudra construire une page d'achat séparée sur `video.intercitesbmx.com` qui crée elle-même le paiement via l'API Checkout SumUp, pour être certain d'avoir accès aux données de la commande (email notamment).
+- ⚠️ Cette page reste à tester de bout en bout en conditions réelles (voir Phase 3 ci-dessous) — le code existe mais n'a pas encore été validé par un vrai paiement test.
+- ⚠️ Le "webhook" actuel n'en est pas vraiment un : `return_url` pointe vers `/api/checkout/webhook`, mais c'est le **navigateur du client** qui y est redirigé après paiement (pas un appel serveur-à-serveur SumUp). Si le client ferme l'onglet avant la redirection, le code ne sera jamais généré ni envoyé. Un vrai webhook `CHECKOUT_STATUS_CHANGED` serait plus robuste (cf. Phase 3, point 11).
 
 ## Domaines
 
@@ -31,7 +29,8 @@ Il faut confirmer si les commandes passées sur la boutique en ligne SumUp (Onli
 
 - La bande-annonce du film joue en fond (autoplay, muet). **Fait** : `src/app/page.tsx` sert actuellement un fichier statique `/trailer.mp4` (dossier `public/`) — distinct du bucket B2 qui contient le film final à télécharger, pas la bande-annonce.
 - Un seul champ : **code d'activation**, avec un bouton "Télécharger" pour valider. **Fait.**
-- Un bouton **Acheter** pour l'achat numérique direct (redirection SumUp, via `NEXT_PUBLIC_SUMUP_BUY_URL`). **Fait** (l'URL n'est pas encore renseignée dans `.env`).
+- Un bouton **Acheter** pour l'achat numérique direct. **Fait** : affiche un champ email inline, puis `POST /api/checkout` crée un checkout SumUp (API Checkout, `hosted_checkout`) et redirige vers la page de paiement hébergée SumUp — `src/app/page.tsx`, `src/app/api/checkout/route.ts`.
+  - Prix piloté par `NEXT_PUBLIC_DIGITAL_PRICE_EUR` (`.env`) — **actuellement à `0.10` pour test** (SumUp rejette `amount: 0` avec une erreur de validation), à remettre au prix réel avant mise en prod.
 
 ## Parcours utilisateurs
 
@@ -47,12 +46,12 @@ Il faut confirmer si les commandes passées sur la boutique en ligne SumUp (Onli
 
 ### B. Acheteur numérique direct (sans DVD)
 
-1. Depuis la page d'accueil, l'utilisateur clique sur "Acheter". On redirige vers l'article SumUp.
-2. Une fois le paiement confirmé, on récupère via l'API SumUp le statut et l'email associés à la commande (mécanique exacte — webhook `CHECKOUT_STATUS_CHANGED` + rappel API, ou polling — à confirmer selon le résultat du test ci-dessus).
-3. Le backend génère un nouveau code (même système que les codes physiques, juste marqué d'une origine "digital") et l'envoie par email au client.
+1. Depuis la page d'accueil, l'utilisateur clique sur "Acheter", saisit son email, et est redirigé vers la page de paiement hébergée SumUp (checkout créé via `POST /api/checkout`, qui enregistre une `Order` en `pending`).
+2. Une fois le paiement effectué, SumUp redirige le navigateur du client vers `return_url` (`/api/checkout/webhook`). Cette route ne fait pas confiance au corps reçu : elle relit le statut réel via `GET /v0.1/checkouts/:id`.
+3. Si `PAID` : le backend marque l'`Order` `paid` (de façon atomique, pour éviter une double génération en cas de retry), génère un nouveau code (même système que les codes physiques, origine `digital`), le lie à la commande, et l'envoie par email via Resend.
 4. Le client va sur `video.intercitesbmx.com`, entre son code reçu par email — à partir de là, le parcours rejoint celui de l'acheteur physique (étape A.3).
 
-**Statut : ⏳ pas commencé** (bloqué par la vérification Phase 0 ci-dessus).
+**Statut : 🔄 codé, pas encore testé de bout en bout.** `src/app/api/checkout/route.ts`, `src/app/api/checkout/webhook/route.ts`, `src/lib/sumup.ts`, `src/lib/email.ts`. Clés `SUMUP_API_KEY`, `SUMUP_MERCHANT_CODE`, `SITE_URL`, `RESEND_API_KEY`, `EMAIL_FROM` renseignées dans `.env`. Prix mis à `0.10` temporairement pour permettre un achat test à coût minime (SumUp rejette `amount: 0`). Reste à valider : un vrai paiement test de bout en bout (checkout → redirection → code généré → email reçu → code utilisable), et la fiabilité du `return_url`-comme-webhook (cf. point d'architecture plus haut).
 
 ## Principes de sécurité retenus
 
@@ -65,9 +64,9 @@ Il faut confirmer si les commandes passées sur la boutique en ligne SumUp (Onli
 - **Base de données** : Supabase (juste une table de codes, usage très léger). Projet Supabase créé et branché (`DATABASE_URL` / `DIRECT_URL` dans `.env`).
   - ⚠️ Le plan gratuit Supabase met le projet en pause après 1 semaine d'inactivité. Ping périodique en place (voir Phase 1 ci-dessous).
 - **ORM** : Prisma (v7, avec `@prisma/adapter-pg`). Schéma défini dans `prisma/schema.prisma` ; **première migration pas encore appliquée** (pas de dossier `prisma/migrations` à date — à faire avant tout usage en prod).
-- **Paiement** : API SumUp (voir point à vérifier en priorité ci-dessus pour savoir si ça passe par l'Online Store existant ou une intégration Checkout séparée).
+- **Paiement** : API SumUp — API Checkout (intégration custom, pas l'Online Store), `src/lib/sumup.ts`. Voir point d'architecture ci-dessus.
 - **Vidéo** : Backblaze B2 (stockage, gratuit jusqu'à 10 Go ; pas besoin de Cloudflare devant — à ce volume, le coût d'egress direct de B2 reste négligeable). Bucket privé `intercites-video` créé, clé d'application scopée en place, mécanisme de lien signé (`src/lib/b2.ts`) testé et fonctionnel de bout en bout avec un fichier de test. Le film complet définitif reste à uploader.
-- **Email transactionnel** : **Resend** (décidé — envoi du code après achat numérique). Intégration pas encore branchée (`RESEND_API_KEY` vide dans `.env`).
+- **Email transactionnel** : **Resend** — envoi du code après achat numérique. Intégration branchée (`src/lib/email.ts`, `sendCodeEmail`), `RESEND_API_KEY` / `EMAIL_FROM` renseignés dans `.env`. Reste à valider par un envoi réel.
 - **Hébergement de l'application** : Vercel (déploiement pas encore confirmé fait).
 - **Interface d'administration** : à construire — génération de lots de codes (liés à un batch/référence DVD), consultation des statuts (utilisé/non utilisé), réémission manuelle en cas de demande support, suivi des commandes SumUp.
 
@@ -101,7 +100,7 @@ Cf. `prisma/schema.prisma` — schéma actuel (affiné par rapport à la version
 Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 
 ### Phase 0 — Vérification bloquante
-1. 🔄 Tester la récupération des commandes SumUp Online Store via l'API (voir section dédiée plus haut). Ce test conditionne l'architecture du parcours B — à faire avant tout développement de la partie paiement.
+1. ✅ Décision d'architecture prise : page d'achat séparée + API Checkout SumUp (voir section dédiée plus haut), plutôt que dépendre de l'Online Store.
 
 ### Phase 1 — Fondations
 2. 🔄 Initialiser le repo Next.js (App Router) — **fait**. Déployer un premier "hello world" sur Vercel, brancher le sous-domaine `video.intercitesbmx.com` — **à faire/confirmer**.
@@ -117,10 +116,10 @@ Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 9. ⏳ Tester le parcours complet de bout en bout avec un code de test réel : saisie → validation → téléchargement → code marqué comme utilisé → nouvelle tentative refusée (nécessite une migration Prisma appliquée + le serveur Next.js lancé).
 
 ### Phase 3 — Achat numérique
-10. ⏳ Selon le résultat de la Phase 0 : implémenter soit la récupération via l'Online Store existant, soit une page d'achat séparée avec l'API Checkout SumUp.
-11. ⏳ Mettre en place le webhook SumUp (`CHECKOUT_STATUS_CHANGED`) et la vérification du statut de paiement associée.
-12. ⏳ Brancher **Resend** : génération d'un nouveau code à la confirmation du paiement, envoi par email avec un gabarit simple.
-13. ⏳ Tester le parcours complet : achat test → réception de l'email → code utilisable comme en Phase 2.
+10. ✅ Page d'achat séparée avec l'API Checkout SumUp — `src/app/api/checkout/route.ts`, `src/lib/sumup.ts`.
+11. 🔄 Vérification du statut de paiement en place via `return_url` (`/api/checkout/webhook`, relit toujours le statut via l'API avant d'agir) — mais ce n'est pas un vrai webhook serveur-à-serveur `CHECKOUT_STATUS_CHANGED` : si le client ferme l'onglet avant la redirection, rien ne se déclenche. À durcir avant la mise en prod.
+12. ✅ Resend branché : génération d'un nouveau code à la confirmation du paiement, envoi par email — `src/lib/email.ts`.
+13. ⏳ Tester le parcours complet : achat test (prix à `0` actuellement pour ça) → réception de l'email → code utilisable comme en Phase 2. Pas encore fait.
 
 ### Phase 4 — Interface d'administration
 14. ⏳ Écran listant les lots de codes (généré, utilisé/non utilisé, origine physique/digital) et permettant d'exporter un lot en CSV pour l'impression.

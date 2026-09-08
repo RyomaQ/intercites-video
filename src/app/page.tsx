@@ -197,10 +197,10 @@ export default function Home() {
         />
 
         <p className="text-[0.95rem] leading-relaxed text-white/75">
-          Years in the making, this film brings together the French BMX street
-          scene from the youngest riders to the OGs, from major cities to the
-          most remote corners. 7 months of filming, 15,000 km by train, nearly
-          150 riders across the country.
+          Named after France's Intercités trains, this film rides the rails from
+          city to city to capture the French BMX street scene from the youngest
+          riders to the OGs, from major hubs to the most remote corners. 15,000
+          km traveled by train, 7 months on the road, nearly 150 riders.
         </p>
 
         <div className="mt-1 flex w-full flex-col items-stretch gap-6">

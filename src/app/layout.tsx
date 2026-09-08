@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Intercité — Accès en ligne",
-  description: "Téléchargez le film Intercité avec votre code d'activation.",
+  title: "Intercité — Online Access",
+  description: "Download the Intercité film with your activation code.",
+  icons: {
+    icon: "/favicon-intercites.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

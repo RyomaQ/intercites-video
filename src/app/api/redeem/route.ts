@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const codeValue = rawCode.trim().toUpperCase().replace(/\s+/g, "");
 
   if (!codeValue) {
-    return NextResponse.json({ error: "Code manquant." }, { status: 400 });
+    return NextResponse.json({ error: "Code is required." }, { status: 400 });
   }
 
   // Le lien signé est préparé avant de consommer le code : générer une URL
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Erreur génération lien B2 :", err);
     return NextResponse.json(
-      { error: "Le téléchargement n'a pas pu être préparé. Réessayez dans un instant." },
+      { error: "The download couldn't be prepared. Please try again in a moment." },
       { status: 500 }
     );
   }
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
   if (count === 0) {
     const existing = await prisma.code.findUnique({ where: { codeValue } });
     const message = existing
-      ? "Ce code a déjà été utilisé."
-      : "Code invalide.";
+      ? "This code has already been used."
+      : "Invalid code.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 

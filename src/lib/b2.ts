@@ -1,5 +1,6 @@
 const AUTHORIZE_URL = "https://api.backblazeb2.com/b2api/v2/b2_authorize_account";
 const DOWNLOAD_VALID_SECONDS = 300;
+const TRAILER_VALID_SECONDS = 3600;
 
 interface B2AuthorizeResponse {
   apiUrl: string;
@@ -30,21 +31,19 @@ async function authorizeAccount(): Promise<B2AuthorizeResponse> {
   return res.json();
 }
 
-/**
- * Génère une URL de téléchargement B2 signée, valide quelques minutes,
- * qui force le navigateur à télécharger le fichier (Content-Disposition: attachment).
- */
-export async function getSignedDownloadUrl(): Promise<string> {
+async function getSignedFileUrl(
+  fileName: string,
+  validDurationInSeconds: number,
+  contentDisposition?: string
+): Promise<string> {
   const bucketId = process.env.B2_BUCKET_ID;
   const bucketName = process.env.B2_BUCKET_NAME;
-  const fileName = process.env.B2_FILE_NAME;
-  if (!bucketId || !bucketName || !fileName) {
-    throw new Error("B2_BUCKET_ID / B2_BUCKET_NAME / B2_FILE_NAME manquants");
+  if (!bucketId || !bucketName) {
+    throw new Error("B2_BUCKET_ID / B2_BUCKET_NAME manquants");
   }
 
   const { apiUrl, authorizationToken, downloadUrl } = await authorizeAccount();
 
-  const contentDisposition = `attachment; filename="${fileName}"`;
   const res = await fetch(`${apiUrl}/b2api/v2/b2_get_download_authorization`, {
     method: "POST",
     headers: {
@@ -54,8 +53,8 @@ export async function getSignedDownloadUrl(): Promise<string> {
     body: JSON.stringify({
       bucketId,
       fileNamePrefix: fileName,
-      validDurationInSeconds: DOWNLOAD_VALID_SECONDS,
-      b2ContentDisposition: contentDisposition,
+      validDurationInSeconds,
+      ...(contentDisposition ? { b2ContentDisposition: contentDisposition } : {}),
     }),
   });
 
@@ -65,5 +64,35 @@ export async function getSignedDownloadUrl(): Promise<string> {
 
   const { authorizationToken: downloadAuthToken }: B2DownloadAuthResponse = await res.json();
 
-  return `${downloadUrl}/file/${bucketName}/${encodeURIComponent(fileName)}?Authorization=${downloadAuthToken}`;
+  const params = new URLSearchParams({ Authorization: downloadAuthToken });
+  if (contentDisposition) params.set("b2ContentDisposition", contentDisposition);
+
+  return `${downloadUrl}/file/${bucketName}/${encodeURIComponent(fileName)}?${params.toString()}`;
+}
+
+/**
+ * Génère une URL de téléchargement B2 signée, valide quelques minutes,
+ * qui force le navigateur à télécharger le fichier (Content-Disposition: attachment).
+ */
+export async function getSignedDownloadUrl(): Promise<string> {
+  const fileName = process.env.B2_FILE_NAME;
+  if (!fileName) throw new Error("B2_FILE_NAME manquant");
+
+  return getSignedFileUrl(
+    fileName,
+    DOWNLOAD_VALID_SECONDS,
+    `attachment; filename="${fileName}"`
+  );
+}
+
+/**
+ * URL de lecture (pas de forçage de téléchargement) pour la bande-annonce en
+ * fond de page. Validité longue car la vidéo boucle et peut être lue par
+ * requêtes Range bien après le chargement initial.
+ */
+export async function getSignedTrailerUrl(): Promise<string> {
+  const fileName = process.env.B2_TRAILER_FILE_NAME;
+  if (!fileName) throw new Error("B2_TRAILER_FILE_NAME manquant");
+
+  return getSignedFileUrl(fileName, TRAILER_VALID_SECONDS);
 }

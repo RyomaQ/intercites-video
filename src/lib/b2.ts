@@ -96,3 +96,14 @@ export async function getSignedTrailerUrl(): Promise<string> {
 
   return getSignedFileUrl(fileName, TRAILER_VALID_SECONDS);
 }
+
+/**
+ * URL de lecture pour la version portrait (9:16) de la bande-annonce, servie
+ * sur mobile.
+ */
+export async function getSignedTrailerMobileUrl(): Promise<string> {
+  const fileName = process.env.B2_TRAILER_MOBILE_FILE_NAME;
+  if (!fileName) throw new Error("B2_TRAILER_MOBILE_FILE_NAME manquant");
+
+  return getSignedFileUrl(fileName, TRAILER_VALID_SECONDS);
+}

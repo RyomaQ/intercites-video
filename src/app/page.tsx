@@ -74,6 +74,7 @@ export default function Home() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [mobileVideoUrl, setMobileVideoUrl] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
 
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +92,7 @@ export default function Home() {
       .then((res) => res.json())
       .then((data) => {
         if (data.url) setVideoUrl(data.url);
+        if (data.mobileUrl) setMobileVideoUrl(data.mobileUrl);
       })
       .catch(() => {});
   }, []);
@@ -166,12 +168,16 @@ export default function Home() {
         <video
           ref={videoRef}
           className="absolute inset-0 z-0 h-full w-full object-cover"
-          src={videoUrl}
           autoPlay
           muted
           loop
           playsInline
-        />
+        >
+          {mobileVideoUrl && (
+            <source media="(max-width: 767px)" src={mobileVideoUrl} type="video/mp4" />
+          )}
+          <source src={videoUrl} type="video/mp4" />
+        </video>
       )}
       <div className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.45)_45%,rgba(0,0,0,0.35)_100%)]" />
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
-import { flushSync } from "react-dom";
 
 const PRICE_EUR = process.env.NEXT_PUBLIC_DIGITAL_PRICE_EUR ?? "4";
 
@@ -79,10 +78,10 @@ export default function Home() {
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   function handleBuyClick() {
-    // flushSync forces the email input to exist in the DOM before we call
-    // .focus() in the same click handler, so the browser still treats the
-    // focus as tied to the user gesture and shows autofill suggestions.
-    flushSync(() => setBuying(true));
+    // The email input is always in the DOM (just hidden) rather than mounted
+    // on demand, so mobile browsers recognize it as a real form field from
+    // page load and offer autofill suggestions when it's focused here.
+    setBuying(true);
     emailInputRef.current?.focus();
   }
 
@@ -207,37 +206,35 @@ export default function Home() {
         </p>
 
         <div className="mt-1 flex w-full flex-col items-stretch gap-6">
-          {!buying ? (
+          <button
+            type="button"
+            onClick={handleBuyClick}
+            hidden={buying}
+            className="inline-flex items-center justify-center gap-[0.4rem] rounded-full border-none bg-brand px-6 py-4 text-base font-bold tracking-[0.02em] text-white transition-colors enabled:hover:bg-brand-hover enabled:active:scale-[0.98] enabled:active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Buy · €{PRICE_EUR}
+            <ChevronIcon />
+          </button>
+          <form onSubmit={handleBuy} className="relative" hidden={!buying}>
+            <input
+              ref={emailInputRef}
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="Your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={buyStatus === "loading"}
+              className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
+            />
             <button
-              type="button"
-              onClick={handleBuyClick}
-              className="inline-flex items-center justify-center gap-[0.4rem] rounded-full border-none bg-brand px-6 py-4 text-base font-bold tracking-[0.02em] text-white transition-colors enabled:hover:bg-brand-hover enabled:active:scale-[0.98] enabled:active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-50"
+              type="submit"
+              disabled={buyStatus === "loading" || !email.trim()}
+              className={embeddedButtonClass}
             >
-              Buy · €{PRICE_EUR}
-              <ChevronIcon />
+              {buyStatus === "loading" ? "…" : `Pay €${PRICE_EUR}`}
             </button>
-          ) : (
-            <form onSubmit={handleBuy} className="relative">
-              <input
-                ref={emailInputRef}
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="Your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={buyStatus === "loading"}
-                className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={buyStatus === "loading" || !email.trim()}
-                className={embeddedButtonClass}
-              >
-                {buyStatus === "loading" ? "…" : `Pay €${PRICE_EUR}`}
-              </button>
-            </form>
-          )}
+          </form>
 
           <form onSubmit={handleSubmit} className="relative">
             <input

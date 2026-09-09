@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
       currency: "EUR",
       description: "Intercités - Digital video",
       returnUrl: `${siteUrl}/api/checkout/webhook`,
+      redirectUrl: `${siteUrl}/thank-you`,
     });
 
     await prisma.order.create({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSignedDownloadUrl } from "@/lib/b2";
+import { getSignedDownloadUrl } from "@/lib/r2";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -12,13 +12,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Le lien signé est préparé avant de consommer le code : générer une URL
-  // B2 ne coûte rien tant qu'elle n'est pas utilisée, donc si l'appel B2
+  // R2 ne coûte rien tant qu'elle n'est pas utilisée, donc si l'appel R2
   // échoue le code reste "unused" et l'utilisateur peut simplement réessayer.
   let downloadUrl: string;
   try {
     downloadUrl = await getSignedDownloadUrl();
   } catch (err) {
-    console.error("Erreur génération lien B2 :", err);
+    console.error("Erreur génération lien R2 :", err);
     return NextResponse.json(
       { error: "The download couldn't be prepared. Please try again in a moment." },
       { status: 500 }

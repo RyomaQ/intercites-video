@@ -26,6 +26,7 @@ export async function createHostedCheckout(params: {
   currency: string;
   description: string;
   returnUrl: string;
+  redirectUrl: string;
 }): Promise<CreateCheckoutResult> {
   const merchantCode = process.env.SUMUP_MERCHANT_CODE;
   if (!merchantCode) throw new Error("SUMUP_MERCHANT_CODE manquant");
@@ -40,6 +41,7 @@ export async function createHostedCheckout(params: {
       description: params.description,
       merchant_code: merchantCode,
       return_url: params.returnUrl,
+      redirect_url: params.redirectUrl,
       hosted_checkout: { enabled: true },
     }),
   });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSignedTrailerUrl, getSignedTrailerMobileUrl } from "@/lib/b2";
+import { getSignedTrailerUrl, getSignedTrailerMobileUrl } from "@/lib/r2";
 
 export async function GET() {
   try {
@@ -9,7 +9,7 @@ export async function GET() {
     ]);
     return NextResponse.json({ url, mobileUrl });
   } catch (err) {
-    console.error("Erreur génération lien bande-annonce B2 :", err);
+    console.error("Erreur génération lien bande-annonce R2 :", err);
     return NextResponse.json({ error: "Bande-annonce indisponible." }, { status: 500 });
   }
 }

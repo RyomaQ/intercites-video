@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { flushSync } from "react-dom";
-import Image from "next/image";
 
 const PRICE_EUR = process.env.NEXT_PUBLIC_DIGITAL_PRICE_EUR ?? "4";
 
@@ -193,14 +192,12 @@ export default function Home() {
       )}
 
       <div className="relative z-10 flex w-full max-w-[560px] flex-col items-start gap-8 px-10 py-16 text-left">
-        <Image
-          src="/logo.png"
-          alt="Intercité"
-          width={140}
-          height={140}
-          priority
-          className="h-[140px] w-[140px] object-contain drop-shadow-[0_2px_20px_rgba(0,0,0,0.6)]"
-        />
+        <h1
+          className="text-5xl font-bold tracking-wide text-white drop-shadow-[0_2px_20px_rgba(0,0,0,0.6)]"
+          style={{ fontFamily: "var(--font-gliker)" }}
+        >
+          Intercités
+        </h1>
 
         <p className="text-[0.95rem] leading-relaxed text-white/75">
           Named after France's Intercités trains, this film rides the rails from

@@ -13,8 +13,10 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
 - ✅ Un vrai paiement test (2€) a été effectué de bout en bout sur `checkout.sumup.com` et confirmé "Paiement réussi" côté SumUp.
   - ⚠️ **Piège rencontré** : à 0,10€ (montant de test initial), la carte était systématiquement refusée — pas un bug de code/API, mais la banque qui flague les micro-transactions comme suspectes (pattern classique de test de carte volée). Passer à un montant plus réaliste (2€ pour les tests, prix réel avant lancement) a résolu le problème.
 - ✅ **Corrigé** : après paiement, le client restait bloqué sur l'écran de confirmation SumUp au lieu d'être ramené sur notre site. Cause : le code n'envoyait que `return_url` (callback backend, censé être serveur-à-serveur d'après la doc SumUp) sans jamais renseigner `redirect_url` (le champ dédié à la redirection du navigateur du client après paiement). `redirect_url` est maintenant envoyé (`src/lib/sumup.ts`, `src/app/api/checkout/route.ts`) et pointe vers `/thank-you`, une page de confirmation sur notre domaine avec un champ code intégré pour télécharger directement.
-  - ⚠️ Ce fix n'a pas encore été revalidé par un nouveau paiement test de bout en bout (le paiement 2€ ci-dessus a eu lieu avant ce correctif) — reste à confirmer que la redirection vers `/thank-you` fonctionne bien en conditions réelles.
+  - ✅ Vérifié visuellement : le bouton "Retour sur le site du commerçant" apparaît bien maintenant sur l'écran de succès SumUp (preuve que `redirect_url` est correctement transmis).
+  - ⚠️ Reste à confirmer par un clic réel que l'atterrissage sur `/thank-you` fonctionne de bout en bout (le paiement 2€ testé de bout en bout a eu lieu avant ce correctif).
 - ⚠️ `return_url` (`/api/checkout/webhook`) reste un callback dont le déclenchement exact par SumUp (serveur-à-serveur vs autre) n'est pas confirmé en pratique — la route ne fait toujours pas confiance au corps reçu et relit systématiquement le statut via l'API. Un vrai webhook `CHECKOUT_STATUS_CHANGED` resterait plus robuste si le client ferme l'onglet avant toute redirection (cf. Phase 3, point 11).
+- L'API Checkout SumUp n'a pas de champ dédié pour attacher l'email/l'identité du client à une transaction (confirmé via la doc — seul `customer_id`, via l'API Customers séparée, existe pour ça). À la place, le champ `description` du checkout embarque `"Intercités - Digital video - {email}"`, visible directement dans le détail de vente du dashboard SumUp (documenté par SumUp comme *"shown in SumUp tools and reporting"*).
 
 ## Domaines
 
@@ -48,6 +50,7 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
 3. Le backend vérifie que le code existe, n'a pas déjà été utilisé, et qu'il reste au moins un téléchargement disponible.
 4. Si valide : le téléchargement se déclenche, et le code est immédiatement marqué comme utilisé.
 5. Le code ne fonctionne plus ensuite, pour personne — un seul téléchargement autorisé par code.
+6. Si un client tombe sur "This code has already been used.", un lien **"Request a new code"** s'affiche (page d'accueil et `/thank-you`) — ouvre un `mailto:quenot.ryoma@gmail.com` pré-rempli avec le code concerné. Purement manuel côté traitement (pas d'automatisation de réémission) : sert de pont léger en attendant l'interface d'admin (Phase 4, point 15).
 
 **Statut : logique backend faite** (`src/app/api/redeem/route.ts`), validation atomique via `updateMany` conditionné sur `status: "unused"`. Génération de lien signé testée isolément (R2, voir Stack technique) mais pas encore de test de bout en bout avec un vrai code + Prisma en conditions réelles.
 
@@ -64,13 +67,15 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
 
 - Codes uniques par DVD (10–12 caractères alphanumériques, majuscules, sans caractères ambigus type 0/O ou 1/l). **Fait** : `src/lib/codes.ts`, alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, longueur 12.
 - Un code = un seul téléchargement autorisé.
+- Row Level Security activée sur les tables Supabase pour empêcher tout accès public via l'API Data auto-générée (voir Stack technique). L'app passe exclusivement par Prisma (rôle `postgres`, `BYPASSRLS`), jamais par la clé publique Supabase.
 
 ## Stack technique
 
 - **Framework** : Next.js (App Router, Next 16).
 - **Base de données** : Supabase (juste une table de codes, usage très léger). Projet Supabase créé et branché (`DATABASE_URL` / `DIRECT_URL` dans `.env`).
   - ⚠️ Le plan gratuit Supabase met le projet en pause après 1 semaine d'inactivité. Ping périodique en place (voir Phase 1 ci-dessous).
-- **ORM** : Prisma (v7, avec `@prisma/adapter-pg`). Schéma défini dans `prisma/schema.prisma` ; **première migration pas encore appliquée** (pas de dossier `prisma/migrations` à date — à faire avant tout usage en prod).
+  - ✅ **Row Level Security activée** sur `codes` et `orders` (migration `enable_rls`). Supabase expose automatiquement une API REST publique par table (Data API) protégée uniquement par RLS — sans ça, n'importe qui avec l'URL du projet + la clé publique (`anon`, censée être publique par design) pouvait lire/écrire directement ces tables, contournant toute la logique métier (un code = un téléchargement). Le rôle `postgres` utilisé par Prisma a `BYPASSRLS`, donc ça n'affecte pas l'app.
+- **ORM** : Prisma (v7, avec `@prisma/adapter-pg`). Schéma défini dans `prisma/schema.prisma`, migrations appliquées dans `prisma/migrations/` (init, ajustements de colonnes, activation RLS).
 - **Paiement** : API SumUp — API Checkout (intégration custom, pas l'Online Store), `src/lib/sumup.ts`. Voir point d'architecture ci-dessus.
 - **Vidéo** : Cloudflare R2 (stockage S3-compatible, egress **gratuit et illimité** — sans ça, remplace Backblaze B2 initialement utilisé). Bucket privé `intercites-bmx`, credentials S3 (Account API Token R2, permission "Object Read & Write", restreint à ce bucket) dans `.env` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`). Liens signés via `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` (`src/lib/r2.ts`), même surface d'API que l'ancien `b2.ts` (download signé avec `Content-Disposition: attachment`, lien de lecture pour les bandes-annonces desktop/mobile). Testé de bout en bout (liste des fichiers + requête Range sur lien signé).
   - **Pourquoi la migration depuis B2** : le plan gratuit B2 impose un cap de bande passante de téléchargement journalier (par défaut 1 Go/jour) qui a été dépassé pendant les tests, bloquant la bande-annonce ET le téléchargement du film (`download_cap_exceeded`). R2 n'a pas cet équivalent — le stockage (10 Go gratuits/mois) et les opérations (1M Class A + 10M Class B gratuites/mois) couvrent largement ce projet, et l'egress reste gratuit à tout volume.
@@ -114,7 +119,7 @@ Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 
 ### Phase 1 — Fondations
 2. 🔄 Initialiser le repo Next.js (App Router) — **fait**. CNAME DNS du sous-domaine `video.intercitesbmx.com` vers Vercel confirmé côté OVH — déploiement Vercel effectif (build en prod, site réellement accessible) **à reconfirmer**.
-3. 🔄 Créer le projet Supabase, définir le schéma Prisma (tables `Code` et `Order`) — **fait**. Lancer la première migration — **à faire** (pas de dossier `prisma/migrations` actuellement).
+3. ✅ Créer le projet Supabase, définir le schéma Prisma (tables `Code` et `Order`), lancer les migrations (RLS activée en plus du schéma de base).
 4. ✅ Mettre en place le ping périodique (GitHub Actions en cron) pour éviter la pause du projet Supabase gratuit — `.github/workflows/supabase-ping.yml` + `src/app/api/ping/route.ts`.
 
 ### Phase 2 — Parcours DVD physique (le cœur du système)
@@ -123,7 +128,7 @@ Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 7. ✅ Route API de validation de code : vérifie existence, statut "non utilisé", décrémente le compteur de téléchargements de façon atomique — `src/app/api/redeem/route.ts`.
 8. ✅ Stockage vidéo sur Cloudflare R2 (migré depuis Backblaze B2, voir Stack technique) + endpoint de lien signé à courte durée de vie avec `Content-Disposition: attachment` — `src/lib/r2.ts`. Testé de bout en bout (liste bucket + requête Range sur lien signé).
    - Le film complet définitif reste à uploader dans le bucket (le fichier actuel est un fichier de test).
-9. ⏳ Tester le parcours complet de bout en bout avec un code de test réel : saisie → validation → téléchargement → code marqué comme utilisé → nouvelle tentative refusée (nécessite une migration Prisma appliquée + le serveur Next.js lancé).
+9. ⏳ Tester le parcours complet de bout en bout avec un code de test réel : saisie → validation → téléchargement → code marqué comme utilisé → nouvelle tentative refusée → lien "Request a new code" affiché.
 
 ### Phase 3 — Achat numérique
 10. ✅ Page d'achat séparée avec l'API Checkout SumUp — `src/app/api/checkout/route.ts`, `src/lib/sumup.ts`.
@@ -133,7 +138,7 @@ Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 
 ### Phase 4 — Interface d'administration
 14. ⏳ Écran listant les lots de codes (généré, utilisé/non utilisé, origine physique/digital) et permettant d'exporter un lot en CSV pour l'impression.
-15. ⏳ Fonction de réémission manuelle d'un accès (nouveau code) en cas de demande support.
+15. 🔄 Fonction de réémission manuelle d'un accès (nouveau code) en cas de demande support — version minimale en place (lien "Request a new code" → `mailto:`, voir Parcours A), reste à construire un vrai outil admin pour générer/renvoyer le code sans repasser par le script CLI.
 16. ⏳ Vue des commandes SumUp associées (utile pour le support et la comptabilité).
 
 ### Phase 5 — Finitions et lancement

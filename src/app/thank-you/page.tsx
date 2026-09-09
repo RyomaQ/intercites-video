@@ -90,7 +90,17 @@ export default function ThankYou() {
       </form>
 
       {status === "error" && (
-        <p className="text-[0.9rem] text-[#ff8080]">{message}</p>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-[0.9rem] text-[#ff8080]">{message}</p>
+          {message === "This code has already been used." && (
+            <a
+              href={`mailto:quenot.ryoma@gmail.com?subject=${encodeURIComponent("Code reissue request")}&body=${encodeURIComponent(`My code ${code} has already been used, can I get a new one?`)}`}
+              className="text-[0.9rem] font-bold text-white underline underline-offset-2"
+            >
+              Request a new code
+            </a>
+          )}
+        </div>
       )}
       {status === "success" && (
         <p className="text-[0.9rem] text-[#7fd99c]">{message}</p>

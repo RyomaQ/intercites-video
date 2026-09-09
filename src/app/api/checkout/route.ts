@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       reference: randomUUID(),
       amount: PRICE_EUR,
       currency: "EUR",
-      description: "Intercités - Digital video",
+      description: `Intercités - Digital video - ${email}`,
       returnUrl: `${siteUrl}/api/checkout/webhook`,
       redirectUrl: `${siteUrl}/thank-you`,
     });

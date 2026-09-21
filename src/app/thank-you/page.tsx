@@ -75,7 +75,7 @@ export default function ThankYou() {
           value={code}
           onChange={(e) => setCode(e.target.value)}
           disabled={status === "loading" || status === "success"}
-          maxLength={12}
+          maxLength={6}
           className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
         />
         <button

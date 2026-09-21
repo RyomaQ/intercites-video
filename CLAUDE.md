@@ -22,7 +22,7 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
 
 - **Site principal** (vitrine du film + vente du DVD physique) : `intercitesbmx.com`, actuellement sur SumUp (boutique en ligne).
 - **Cette plateforme** (redemption du code + téléchargement) : sous-domaine `video.intercitesbmx.com`, hébergée séparément (Vercel), indépendante du site SumUp.
-  - 🔄 CNAME DNS `video` → `vercel-dns` confirmé en place côté OVH. Déploiement Vercel effectif (build + accès réel à `video.intercitesbmx.com`) pas revérifié dans cette session — à confirmer.
+  - ✅ CNAME DNS `video` → `vercel-dns` confirmé en place côté OVH. Déploiement Vercel effectif confirmé : `GET https://video.intercitesbmx.com/api/ping` répond correctement (validé via le run manuel du workflow `supabase-ping.yml` le 2026-09-21).
   - ⚠️ Les variables d'environnement doivent être renseignées séparément sur Vercel (Project Settings → Environment Variables) — `.env` en local n'est jamais lu en prod. Notamment `R2_*` (remplace les anciennes `B2_*`, à supprimer de Vercel) et `SITE_URL` (doit être `https://video.intercitesbmx.com`, pas `localhost`).
 
 ## Objectif de la plateforme
@@ -37,7 +37,7 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
   - ⚠️ **Bug rencontré et corrigé** : la première version de la bande-annonce était encodée en HEVC (H.265) 10-bit, non lue de façon fiable par Safari sur iPhone (échec silencieux, pas d'erreur — juste rien qui s'affiche). Ré-exportée en H.264 8-bit standard (`yuv420p`, profil High) → compatible partout.
   - Titre "Intercités" en `h1` avec une police custom (Gliker, `src/fonts/gliker-regular.ttf`, chargée via `next/font/local`) à la place du logo image.
 - Un seul champ : **code d'activation**, avec un bouton "Télécharger" pour valider. **Fait.**
-- Un bouton **Acheter** pour l'achat numérique direct. **Fait** : affiche un champ email inline, puis `POST /api/checkout` crée un checkout SumUp (API Checkout, `hosted_checkout`) et redirige vers la page de paiement hébergée SumUp — `src/app/page.tsx`, `src/app/api/checkout/route.ts`.
+- Un bouton **Acheter** pour l'achat numérique direct. **⏸️ Désactivé temporairement (2026-09-21)** : le bouton et le formulaire email ont été retirés de `src/app/page.tsx` à la demande — seul le parcours code d'activation reste actif pour le moment. Le backend (`POST /api/checkout`, webhook, `src/lib/sumup.ts`) n'a pas été touché et reste prêt à être réactivé (réintroduire le bloc UI, cf. historique git avant ce commit) d'ici ~2 semaines.
   - Prix piloté par `NEXT_PUBLIC_DIGITAL_PRICE_EUR` (`.env`) — **actuellement à `2` pour test**, à remettre au prix réel avant mise en prod. (Éviter les montants proches de 0 : les banques flaguent souvent les micro-transactions comme suspectes et refusent la carte, indépendamment de toute config SumUp.)
 - Page `/thank-you` (nouvelle) : destination après paiement réussi (`redirect_url` du checkout SumUp). Affiche un message de confirmation (invite à vérifier les spams/indésirables) et un champ code intégré pour télécharger directement sans repasser par la page d'accueil.
 
@@ -82,7 +82,7 @@ Question initiale : les commandes passées sur la boutique en ligne SumUp (Onlin
   - Le film complet définitif reste à uploader (le fichier actuel, `R2_FILE_NAME`, est toujours un placeholder de test).
 - **Email transactionnel** : **Resend** — envoi du code après achat numérique. Intégration branchée (`src/lib/email.ts`, `sendCodeEmail`), `RESEND_API_KEY` / `EMAIL_FROM` renseignés dans `.env`. ✅ Validé par plusieurs envois réels. Domaine `intercitesbmx.com` vérifié sur Resend (DKIM `resend._domainkey`, SPF via CNAME `send`/`rsend`, DMARC `p=none` en mode surveillance). Template HTML + texte brut, avec la ligne "This code can only be used once." en rouge.
   - ⚠️ Les tout premiers emails envoyés atterrissent en indésirable sur Hotmail/Outlook — comportement normal pour un domaine tout juste vérifié sans historique d'envoi auprès de Microsoft, pas un problème de config (SPF/DKIM/DMARC corrects). Ça s'améliore avec le volume/temps d'envoi.
-- **Hébergement de l'application** : Vercel (déploiement pas encore confirmé fait).
+- **Hébergement de l'application** : Vercel. ✅ Déploiement confirmé accessible en prod (`video.intercitesbmx.com`).
 - **Interface d'administration** : à construire — génération de lots de codes (liés à un batch/référence DVD), consultation des statuts (utilisé/non utilisé), réémission manuelle en cas de demande support, suivi des commandes SumUp.
 
 ## Outils de développement
@@ -118,9 +118,10 @@ Légende : ✅ fait · 🔄 en cours · ⏳ pas commencé
 1. ✅ Décision d'architecture prise : page d'achat séparée + API Checkout SumUp (voir section dédiée plus haut), plutôt que dépendre de l'Online Store.
 
 ### Phase 1 — Fondations
-2. 🔄 Initialiser le repo Next.js (App Router) — **fait**. CNAME DNS du sous-domaine `video.intercitesbmx.com` vers Vercel confirmé côté OVH — déploiement Vercel effectif (build en prod, site réellement accessible) **à reconfirmer**.
+2. ✅ Initialiser le repo Next.js (App Router) — **fait**. CNAME DNS du sous-domaine `video.intercitesbmx.com` vers Vercel confirmé côté OVH — déploiement Vercel effectif confirmé (site accessible en prod, `/api/ping` répond).
 3. ✅ Créer le projet Supabase, définir le schéma Prisma (tables `Code` et `Order`), lancer les migrations (RLS activée en plus du schéma de base).
 4. ✅ Mettre en place le ping périodique (GitHub Actions en cron) pour éviter la pause du projet Supabase gratuit — `.github/workflows/supabase-ping.yml` + `src/app/api/ping/route.ts`.
+   - ⚠️ **Incident du 2026-09-21** : le secret GitHub Actions `SUPABASE_PING_URL` n'avait jamais été configuré (workflow créé sans le secret associé) → tous les runs échouaient silencieusement (`curl: (3) URL rejected: Malformed input to a URL function`) → le projet Supabase s'est mis en pause après 7 jours d'inactivité réelle. Secret ajouté (`https://video.intercitesbmx.com/api/ping`), run manuel relancé et confirmé ✅ vert. Projet Supabase restauré manuellement depuis le dashboard.
 
 ### Phase 2 — Parcours DVD physique (le cœur du système)
 5. ✅ Script d'admin/CLI pour générer un lot de codes uniques (10–12 caractères, sans caractères ambigus) et les insérer en base — `scripts/generate-codes.ts` (`npm run generate-codes -- --count N --origin physical --batch "..."`).

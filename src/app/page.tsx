@@ -2,33 +2,11 @@
 
 import { useState, useEffect, useRef, FormEvent } from "react";
 
-const PRICE_EUR = process.env.NEXT_PUBLIC_DIGITAL_PRICE_EUR ?? "4";
-
-function ChevronIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M6 3.5L10.5 8L6 12.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
     <svg
-      width="26"
-      height="26"
+      width="34"
+      height="34"
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -63,27 +41,10 @@ export default function Home() {
   >("idle");
   const [message, setMessage] = useState("");
 
-  const [buying, setBuying] = useState(false);
-  const [email, setEmail] = useState("");
-  const [buyStatus, setBuyStatus] = useState<"idle" | "loading" | "error">(
-    "idle",
-  );
-  const [buyMessage, setBuyMessage] = useState("");
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [mobileVideoUrl, setMobileVideoUrl] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
-
-  const emailInputRef = useRef<HTMLInputElement>(null);
-
-  function handleBuyClick() {
-    // The email input is always in the DOM (just hidden) rather than mounted
-    // on demand, so mobile browsers recognize it as a real form field from
-    // page load and offer autofill suggestions when it's focused here.
-    setBuying(true);
-    emailInputRef.current?.focus();
-  }
 
   useEffect(() => {
     fetch("/api/trailer")
@@ -100,34 +61,6 @@ export default function Home() {
     if (!video) return;
     video.muted = !video.muted;
     setMuted(video.muted);
-  }
-
-  async function handleBuy(e: FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-
-    setBuyStatus("loading");
-    setBuyMessage("");
-
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setBuyStatus("error");
-        setBuyMessage(data.error ?? "Something went wrong.");
-        return;
-      }
-
-      window.location.href = data.url;
-    } catch {
-      setBuyStatus("error");
-      setBuyMessage("Couldn't reach the server. Please try again.");
-    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -184,7 +117,7 @@ export default function Home() {
           type="button"
           onClick={toggleSound}
           aria-label={muted ? "Unmute" : "Mute"}
-          className="absolute right-6 top-6 z-20 flex h-16 w-16 items-center justify-center rounded-full border border-white/25 bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-black/60"
+          className="absolute right-6 top-6 z-20 flex h-20 w-20 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white backdrop-blur-md transition-colors hover:bg-white/25"
         >
           <SpeakerIcon muted={muted} />
         </button>
@@ -206,36 +139,6 @@ export default function Home() {
         </p>
 
         <div className="mt-1 flex w-full flex-col items-stretch gap-6">
-          <button
-            type="button"
-            onClick={handleBuyClick}
-            hidden={buying}
-            className="inline-flex items-center justify-center gap-[0.4rem] rounded-full border-none bg-brand px-6 py-4 text-base font-bold tracking-[0.02em] text-white transition-colors enabled:hover:bg-brand-hover enabled:active:scale-[0.98] enabled:active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Buy · €{PRICE_EUR}
-            <ChevronIcon />
-          </button>
-          <form onSubmit={handleBuy} className="relative" hidden={!buying}>
-            <input
-              ref={emailInputRef}
-              type="email"
-              name="email"
-              autoComplete="email"
-              placeholder="Your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={buyStatus === "loading"}
-              className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={buyStatus === "loading" || !email.trim()}
-              className={embeddedButtonClass}
-            >
-              {buyStatus === "loading" ? "…" : `Pay €${PRICE_EUR}`}
-            </button>
-          </form>
-
           <form onSubmit={handleSubmit} className="relative">
             <input
               type="text"
@@ -247,7 +150,7 @@ export default function Home() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               disabled={status === "loading" || status === "success"}
-              maxLength={12}
+              maxLength={6}
               className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
             />
             <button
@@ -277,9 +180,6 @@ export default function Home() {
         )}
         {status === "success" && (
           <p className="text-[0.9rem] text-[#7fd99c]">{message}</p>
-        )}
-        {buyStatus === "error" && (
-          <p className="text-[0.9rem] text-[#ff8080]">{buyMessage}</p>
         )}
       </div>
     </main>

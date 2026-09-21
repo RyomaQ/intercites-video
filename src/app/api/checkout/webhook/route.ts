@@ -55,7 +55,9 @@ export async function POST(req: NextRequest) {
         codeValue = generateCodeValue();
       } while (await prisma.code.findUnique({ where: { codeValue } }));
 
-      const code = await prisma.code.create({ data: { codeValue, origin: "digital" } });
+      const code = await prisma.code.create({
+        data: { codeValue, origin: "digital", email: order.email },
+      });
       order = await prisma.order.update({
         where: { sumupCheckoutId: checkoutId },
         data: { codeId: code.id },

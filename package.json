@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate-codes": "tsx --env-file=.env scripts/generate-codes.ts"
+    "generate-codes": "tsx --env-file=.env scripts/generate-codes.ts",
+    "upload-r2": "tsx --env-file=.env scripts/upload-to-r2.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1128.0",
@@ -25,6 +26,7 @@
     "resend": "^6.26.0"
   },
   "devDependencies": {
+    "@aws-sdk/lib-storage": "^3.1141.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { isMobileDevice, MOBILE_BLOCKED_MESSAGE } from "@/lib/device";
 import Image from "next/image";
 
 const embeddedButtonClass =
@@ -16,6 +17,12 @@ export default function ThankYou() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!code.trim()) return;
+
+    if (isMobileDevice()) {
+      setStatus("error");
+      setMessage(MOBILE_BLOCKED_MESSAGE);
+      return;
+    }
 
     setStatus("loading");
     setMessage("");

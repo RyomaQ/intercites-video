@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSignedDownloadUrl } from "@/lib/r2";
+import { isMobileUserAgent, MOBILE_BLOCKED_MESSAGE } from "@/lib/device";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -9,6 +10,15 @@ export async function POST(req: NextRequest) {
 
   if (!codeValue) {
     return NextResponse.json({ error: "Code is required." }, { status: 400 });
+  }
+
+  // Filet de sécurité serveur (la page bloque déjà côté client) : refusé
+  // avant l'UPDATE, donc le code reste "unused".
+  if (
+    isMobileUserAgent(req.headers.get("user-agent")) ||
+    req.headers.get("sec-ch-ua-mobile") === "?1"
+  ) {
+    return NextResponse.json({ error: MOBILE_BLOCKED_MESSAGE }, { status: 400 });
   }
 
   // Le lien signé est préparé avant de consommer le code : générer une URL

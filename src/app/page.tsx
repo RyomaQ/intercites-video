@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
+import { isMobileDevice, MOBILE_BLOCKED_MESSAGE } from "@/lib/device";
 
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
@@ -66,6 +67,12 @@ export default function Home() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!code.trim()) return;
+
+    if (isMobileDevice()) {
+      setStatus("error");
+      setMessage(MOBILE_BLOCKED_MESSAGE);
+      return;
+    }
 
     setStatus("loading");
     setMessage("");

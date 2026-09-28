@@ -4,7 +4,7 @@
 // Détection best-effort (user-agent), contournable via "version ordinateur".
 
 export const MOBILE_BLOCKED_MESSAGE =
-  "Downloading only works on a computer. Please open this page on a computer — your code is still valid.";
+  "Downloading only works on a computer. Please open this page on a computer.";
 
 const MOBILE_UA_PATTERN =
   /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i;

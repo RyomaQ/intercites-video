@@ -3,6 +3,28 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { isMobileDevice, MOBILE_BLOCKED_MESSAGE } from "@/lib/device";
 
+const PRICE_EUR = process.env.NEXT_PUBLIC_DIGITAL_PRICE_EUR ?? "4";
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M6 3.5L10.5 8L6 12.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
     <svg
@@ -42,10 +64,27 @@ export default function Home() {
   >("idle");
   const [message, setMessage] = useState("");
 
+  const [buying, setBuying] = useState(false);
+  const [email, setEmail] = useState("");
+  const [buyStatus, setBuyStatus] = useState<"idle" | "loading" | "error">(
+    "idle",
+  );
+  const [buyMessage, setBuyMessage] = useState("");
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [mobileVideoUrl, setMobileVideoUrl] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
+
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  function handleBuyClick() {
+    // The email input is always in the DOM (just hidden) rather than mounted
+    // on demand, so mobile browsers recognize it as a real form field from
+    // page load and offer autofill suggestions when it's focused here.
+    setBuying(true);
+    emailInputRef.current?.focus();
+  }
 
   useEffect(() => {
     fetch("/api/trailer")
@@ -62,6 +101,34 @@ export default function Home() {
     if (!video) return;
     video.muted = !video.muted;
     setMuted(video.muted);
+  }
+
+  async function handleBuy(e: FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setBuyStatus("loading");
+    setBuyMessage("");
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setBuyStatus("error");
+        setBuyMessage(data.error ?? "Something went wrong.");
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch {
+      setBuyStatus("error");
+      setBuyMessage("Couldn't reach the server. Please try again.");
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -139,13 +206,44 @@ export default function Home() {
         </h1>
 
         <p className="text-[0.95rem] leading-relaxed text-white/75">
-          Named after France's Intercités trains, this film rides the rails from
-          city to city to capture the French BMX street scene from the youngest
-          riders to the OGs, from major hubs to the most remote corners. 15,000
-          km traveled by train, 7 months on the road, nearly 150 riders.
+          &ldquo;Intercités&rdquo; is a 90min full-length DVD featuring nearly
+          150 riders from all across France. From the OGs who shaped their
+          generation to the young guns coming up today, alongside some of the
+          most influential riders of 2026. This project is a way to thank
+          everyone who keeps the French BMX scene alive. Enjoy the ride.
         </p>
 
         <div className="mt-1 flex w-full flex-col items-stretch gap-6">
+          <button
+            type="button"
+            onClick={handleBuyClick}
+            hidden={buying}
+            className="inline-flex items-center justify-center gap-[0.4rem] rounded-full border-none bg-brand px-6 py-4 text-base font-bold tracking-[0.02em] text-white transition-colors enabled:hover:bg-brand-hover enabled:active:scale-[0.98] enabled:active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Buy · €{PRICE_EUR}
+            <ChevronIcon />
+          </button>
+          <form onSubmit={handleBuy} className="relative" hidden={!buying}>
+            <input
+              ref={emailInputRef}
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="Your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={buyStatus === "loading"}
+              className="h-full w-full rounded-full border border-white/25 bg-white/8 py-4 pl-5 pr-[6.5rem] text-base tracking-[0.08em] text-white backdrop-blur-md placeholder:tracking-normal placeholder:text-white/50 focus:border-brand-hover focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={buyStatus === "loading" || !email.trim()}
+              className={embeddedButtonClass}
+            >
+              {buyStatus === "loading" ? "…" : `Pay €${PRICE_EUR}`}
+            </button>
+          </form>
+
           <form onSubmit={handleSubmit} className="relative">
             <input
               type="text"
@@ -187,6 +285,9 @@ export default function Home() {
         )}
         {status === "success" && (
           <p className="text-[0.9rem] text-[#7fd99c]">{message}</p>
+        )}
+        {buyStatus === "error" && (
+          <p className="text-[0.9rem] text-[#ff8080]">{buyMessage}</p>
         )}
       </div>
     </main>

@@ -10,6 +10,6 @@ export async function GET() {
     return NextResponse.json({ url, mobileUrl });
   } catch (err) {
     console.error("Erreur génération lien bande-annonce R2 :", err);
-    return NextResponse.json({ error: "Bande-annonce indisponible." }, { status: 500 });
+    return NextResponse.json({ error: "Trailer unavailable." }, { status: 500 });
   }
 }

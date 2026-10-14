@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const checkoutId = typeof body?.id === "string" ? body.id : "";
 
   if (!checkoutId) {
-    return NextResponse.json({ error: "id manquant." }, { status: 400 });
+    return NextResponse.json({ error: "Missing id." }, { status: 400 });
   }
 
   let status: string;
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     status = (await getCheckoutStatus(checkoutId)).status;
   } catch (err) {
     console.error("Erreur vérification checkout SumUp :", err);
-    return NextResponse.json({ error: "Vérification impossible." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't verify the payment." }, { status: 502 });
   }
 
   if (status !== "PAID") {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       await sendCodeEmail(order.email, order.code.codeValue);
     } catch (err) {
       console.error("Erreur envoi email Resend :", err);
-      return NextResponse.json({ error: "Envoi de l'email échoué." }, { status: 500 });
+      return NextResponse.json({ error: "Couldn't send the email." }, { status: 500 });
     }
   }
 
